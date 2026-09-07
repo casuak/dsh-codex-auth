@@ -1,0 +1,176 @@
+# dsh-codex-auth bundle patch
+#
+# Mounted through the `dsh.profile.bundles` channel (or manually via the
+# profile's own cordis.patch.yml). Two contributions:
+#
+# 1. `codex-auth` — the host-plane credential bridge. It reads the local
+#    Codex CLI's ChatGPT OAuth tokens (`~/.codex/auth.json`) and mirrors them
+#    into the DSH credential record `llm-pi-ai/openai-codex` so the pi-ai
+#    `openai-codex` catalog route authenticates with the existing Codex
+#    login. On any machine the plugin is installed on, the default authPath
+#    is `%USERPROFILE%/.codex/auth.json` — no per-machine configuration.
+#
+# 2. `llm-pi-ai` — the row-id override that makes this package the single
+#    source of truth for the `openai-codex` route configuration: the eight
+#    models (four catalog/declared models plus their `-1m` presentation copies
+#    with a 1,000,000-token context window), all explicitly declaring
+#    `input: [ text, image ]` so every GPT model accepts image attachments
+#    (gpt-6-astra is not in the installed pi-ai catalog and needs its own
+#    declaration — an implied fallback would be text-only), lowercase id-style
+#    display names, and the five reasoning levels (low/medium/high/xhigh/max).
+#    No settings.yaml edit is needed; a `llm-pi-ai:` settings section (if one
+#    exists) merges per provider and may still override individual fields.
+#
+# Semantics are deliberately READ-ONLY with respect to the Codex CLI:
+# - `~/.codex/auth.json` is only ever read, never rewritten.
+# - The bridge never performs an OAuth refresh itself.
+# - The stored record pins `expires` to a far-future value so pi-ai's own
+#   refresh path never triggers (refresh-token rotation would invalidate the
+#   Codex CLI's copy).
+# - When the Codex CLI refreshes the tokens (codex login / any codex run),
+#   the bridge picks up the new access token within one sync interval
+#   (default 30s) and updates the record.
+# - If the tokens are expired and no Codex CLI activity restores them, model
+#   requests fail with the provider's authentication error; run `codex login`
+#   to recover.
+#
+# `-1m` wire remap: pi-ai sends `model.id` verbatim to chatgpt.com, so the
+# bridge rewrites a `*-1m` model back to its base model at the `llm/stream`
+# waterfall with a NEW options object (loop-built requests are deep-frozen
+# and must never be mutated). The backend always receives `gpt-5.6-sol`
+# while the UI shows `gpt-5.6-sol-1m`; this logic lives in index.js.
+
+- insert:
+    # Optional configuration overrides (all defaults shown):
+    #   config:
+    #     authPath: C:\Users\wyj\.codex\auth.json
+    #     recordKey: llm-pi-ai/openai-codex
+    #     syncIntervalMs: 30000
+    - id: codex-auth
+      name: dsh-codex-auth
+      config: {}
+
+- id: llm-pi-ai
+  config:
+    providers:
+      openai-codex:
+        models:
+          - id: gpt-5.6-sol
+            name: gpt-5.6-sol
+            contextWindow: 1000000
+            maxTokens: 128000
+            input: [ text, image ]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+          - id: gpt-5.6-terra
+            name: gpt-5.6-terra
+            contextWindow: 1000000
+            maxTokens: 128000
+            input: [ text, image ]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+          - id: gpt-5.6-luna
+            name: gpt-5.6-luna
+            contextWindow: 1000000
+            maxTokens: 128000
+            input: [ text, image ]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+          - id: gpt-5.6-sol-1m
+            name: gpt-5.6-sol-1m
+            contextWindow: 1000000
+            maxTokens: 128000
+            input: [ text, image ]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+          - id: gpt-5.6-terra-1m
+            name: gpt-5.6-terra-1m
+            contextWindow: 1000000
+            maxTokens: 128000
+            input: [ text, image ]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+          - id: gpt-5.6-luna-1m
+            name: gpt-5.6-luna-1m
+            contextWindow: 1000000
+            maxTokens: 128000
+            input: [ text, image ]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+          - id: gpt-6-astra
+            name: gpt-6-astra
+            contextWindow: 1000000
+            maxTokens: 128000
+            input: [ text, image ]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+          - id: gpt-6-astra-1m
+            name: gpt-6-astra-1m
+            contextWindow: 1000000
+            maxTokens: 128000
+            input: [ text, image ]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+        # Transient pi-ai transport failures are classified by dsh-llm-pi-ai
+        # under the catch-all code PI_AI_ERROR ("WebSocket error" mid-stream on
+        # the chatgpt.com backend, "WebSocket closed 1006", …), which is NOT in
+        # the framework's default retryable set (EMPTY_RESPONSE/RATE_LIMIT/
+        # SERVER/TIMEOUT/TRANSPORT) — hence the occasional "本轮运行失败
+        # WebSocket error PI_AI_ERROR" with no retry. This policy admits those
+        # failures to recovery and fixes the interval at a flat 10s:
+        # maxRetries 5 ⇒ first request + up to 5 retries, 10s apart.
+        # Executed by the dsh-base `llm-retry` plugin on the agent loop's
+        # `agent/request-error` recovery point (the web UI shows the countdown).
+        #
+        # CONTEXT_WINDOW_EXCEEDED is also admitted: the web profile disables
+        # the platform's compaction-based overflow recovery, and the usage-based
+        # detector can flag a request the backend actually served successfully
+        # (silent-overflow heuristic vs. the real window), which retrying has
+        # been observed to clear. A true overflow still fails after maxRetries.
+        retryPolicy:
+          mode: normal
+          maxRetries: 5
+          retryableCodes:
+            - PI_AI_ERROR
+            - CONTEXT_WINDOW_EXCEEDED
+            - TRANSPORT
+            - TIMEOUT
+            - SERVER
+            - RATE_LIMIT
+            - EMPTY_RESPONSE
+          backoff:
+            initialDelayMs: 10000
+            maxDelayMs: 10000
+            jitterRatio: 0

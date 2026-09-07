@@ -1,0 +1,35 @@
+{
+  "name": "dsh-codex-auth",
+  "version": "0.1.0",
+  "description": "Reuse local Codex CLI ChatGPT credentials to serve GPT models through the llm-pi-ai openai-codex route (read-only: never refreshes or rewrites ~/.codex/auth.json).",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "codex",
+    "openai",
+    "chatgpt"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
