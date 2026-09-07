@@ -11,9 +11,10 @@
 #    is `%USERPROFILE%/.codex/auth.json` — no per-machine configuration.
 #
 # 2. `llm-pi-ai` — the row-id override that makes this package the single
-#    source of truth for the `openai-codex` route configuration: the eight
-#    models (four catalog/declared models plus their `-1m` presentation copies
-#    with a 1,000,000-token context window), all explicitly declaring
+#    source of truth for the `openai-codex` route configuration: three models
+#    (the `-1m` presentation copy gpt-6-astra-1m plus the base models
+#    gpt-6-astra and gpt-5.6-sol, in that display order), each with a
+#    1,000,000-token context window, all explicitly declaring
 #    `input: [ text, image ]` so every GPT model accepts image attachments
 #    (gpt-6-astra is not in the installed pi-ai catalog and needs its own
 #    declaration — an implied fallback would be text-only), lowercase id-style
@@ -37,8 +38,8 @@
 # `-1m` wire remap: pi-ai sends `model.id` verbatim to chatgpt.com, so the
 # bridge rewrites a `*-1m` model back to its base model at the `llm/stream`
 # waterfall with a NEW options object (loop-built requests are deep-frozen
-# and must never be mutated). The backend always receives `gpt-5.6-sol`
-# while the UI shows `gpt-5.6-sol-1m`; this logic lives in index.js.
+# and must never be mutated). The backend always receives `gpt-6-astra`
+# while the UI shows `gpt-6-astra-1m`; this logic lives in index.js.
 
 - insert:
     # Optional configuration overrides (all defaults shown):
@@ -55,63 +56,8 @@
     providers:
       openai-codex:
         models:
-          - id: gpt-5.6-sol
-            name: gpt-5.6-sol
-            contextWindow: 1000000
-            maxTokens: 128000
-            input: [ text, image ]
-            reasoningEfforts:
-              low: low
-              medium: medium
-              high: high
-              xhigh: xhigh
-              max: max
-          - id: gpt-5.6-terra
-            name: gpt-5.6-terra
-            contextWindow: 1000000
-            maxTokens: 128000
-            input: [ text, image ]
-            reasoningEfforts:
-              low: low
-              medium: medium
-              high: high
-              xhigh: xhigh
-              max: max
-          - id: gpt-5.6-luna
-            name: gpt-5.6-luna
-            contextWindow: 1000000
-            maxTokens: 128000
-            input: [ text, image ]
-            reasoningEfforts:
-              low: low
-              medium: medium
-              high: high
-              xhigh: xhigh
-              max: max
-          - id: gpt-5.6-sol-1m
-            name: gpt-5.6-sol-1m
-            contextWindow: 1000000
-            maxTokens: 128000
-            input: [ text, image ]
-            reasoningEfforts:
-              low: low
-              medium: medium
-              high: high
-              xhigh: xhigh
-              max: max
-          - id: gpt-5.6-terra-1m
-            name: gpt-5.6-terra-1m
-            contextWindow: 1000000
-            maxTokens: 128000
-            input: [ text, image ]
-            reasoningEfforts:
-              low: low
-              medium: medium
-              high: high
-              xhigh: xhigh
-              max: max
-          - id: gpt-5.6-luna-1m
-            name: gpt-5.6-luna-1m
+          - id: gpt-6-astra-1m
+            name: gpt-6-astra-1m
             contextWindow: 1000000
             maxTokens: 128000
             input: [ text, image ]
@@ -132,8 +78,8 @@
               high: high
               xhigh: xhigh
               max: max
-          - id: gpt-6-astra-1m
-            name: gpt-6-astra-1m
+          - id: gpt-5.6-sol
+            name: gpt-5.6-sol
             contextWindow: 1000000
             maxTokens: 128000
             input: [ text, image ]

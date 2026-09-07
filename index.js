@@ -4,7 +4,7 @@
  * Reads the local Codex CLI ChatGPT OAuth tokens (`~/.codex/auth.json`) and
  * mirrors them into the DSH credential record that llm-pi-ai's `openai-codex`
  * catalog route reads (`llm-pi-ai/openai-codex`), so the GPT models of the
- * Codex catalog (gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna, endpoint
+ * Codex catalog (gpt-6-astra-1m / gpt-6-astra / gpt-5.6-sol, endpoint
  * https://chatgpt.com/backend-api) authenticate with the existing Codex
  * login.
  *
@@ -19,13 +19,13 @@
  *  - Expired tokens surface as the provider's authentication error on the
  *    next model request; `codex login` restores them.
  *
- * `-1m` model aliases: the settings profile declares `gpt-5.6-sol-1m` etc.
- * as presentation copies of the corresponding catalog models with a
- * 1,000,000-token context window. pi-ai sends `model.id` verbatim to
- * chatgpt.com, so this plugin rewrites a `*-1m` model back to its base model
- * at the `llm/stream` waterfall (with a NEW options object — a loop-built
- * request is deep-frozen and must never be mutated). The backend therefore
- * always receives `gpt-5.6-sol` while the user still sees `gpt-5.6-sol-1m`.
+ * `-1m` model alias: the manifest declares `gpt-6-astra-1m` as the
+ * presentation copy of gpt-6-astra with a 1,000,000-token context window.
+ * pi-ai sends `model.id` verbatim to chatgpt.com, so this plugin rewrites a
+ * `*-1m` model back to its base model at the `llm/stream` waterfall (with a
+ * NEW options object — a loop-built request is deep-frozen and must never be
+ * mutated). The backend therefore always receives `gpt-6-astra` while the
+ * user still sees `gpt-6-astra-1m`.
  */
 
 import { readFile } from 'node:fs/promises'

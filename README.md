@@ -4,7 +4,7 @@
 > 安装使用：`dsh plugin --profile web add file:<本目录>` 或 `git clone https://github.com/casuak/dsh-codex-auth.git` 后本地安装。
 
 利用本机 Codex CLI 的 ChatGPT 登录凭据（`~/.codex/auth.json`），让 DeepSeek Harness 通过
-`llm-pi-ai` 的 `openai-codex` 路由直接调用 GPT 模型（`gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna`）。
+`llm-pi-ai` 的 `openai-codex` 路由直接调用 GPT 模型（`gpt-6-astra-1m` / `gpt-6-astra` / `gpt-5.6-sol`）。
 
 ## 工作原理
 
@@ -34,8 +34,9 @@
 3. 该机器需已登录 Codex CLI（`codex login` 或使用过 Codex CLI，产生 `~/.codex/auth.json`）。
 4. 重启该 profile 的 DSH 服务。插件自动：
    - 把本机 Codex 凭据桥接进 `llm-pi-ai/openai-codex`；
-   - 注册 `openai-codex` 路由（八个模型：四本体 + 四个 `-1m` 副本、小写名称、五档思考强度、
-     全部声明 `input: [ text, image ]` 图片输入）。
+   - 注册 `openai-codex` 路由（三个模型：`gpt-6-astra-1m` / `gpt-6-astra` / `gpt-5.6-sol`、
+      全部上下文上限 1M、小写名称、五档思考强度、
+      全部声明 `input: [ text, image ]` 图片输入）。
 
 无需任何机器相关的配置修改：auth 路径默认取 `%USERPROFILE%\.codex\auth.json`，
 全部路由参数内置于插件。
@@ -66,11 +67,11 @@ pnpm add file:C:\Users\wyj\Desktop\dsh_test\dsh_codex_auth\dsh-codex-auth
 本插件是 `openai-codex` 路由配置的**唯一来源**（通过 bundle patch 以 row id `llm-pi-ai`
 覆盖组合行，见 `cordis.patch.yml`）：
 
-- 八个模型：`gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna` / `gpt-6-astra` 及各自 `-1m` 呈现副本
-  （`gpt-6-astra-1m` 与五个 5.6 模型的本体/副本结构一致；**全部八个模型均声明
-  `contextWindow: 1000000`、`maxTokens: 128000`**；线缆上把 `-1m` 重映射回本体模型）；
+- 三个模型（按陈列顺序）：`gpt-6-astra-1m` / `gpt-6-astra` / `gpt-5.6-sol`，
+  **全部声明 `contextWindow: 1000000`（上下文上限 1M）、`maxTokens: 128000`**；
+  线缆上把 `*-1m` 重映射回本体模型；
 - 显示名统一小写 id 风格（覆盖 catalog 默认的 "GPT-5.6 Sol" 式命名）；
-- 全部八个模型显式声明图片输入（`input: [ text, image ]`）——`gpt-5.6-*` 本体虽可从
+- 全部三个模型显式声明图片输入（`input: [ text, image ]`）——`gpt-5.6-sol` 本体虽可从
   pi-ai catalog 继承该能力，但 `gpt-6-astra` 不在 catalog 内，若不声明会退化为纯文本；
 - 全部模型思考强度档位：`low / medium / high / xhigh / max` 五档；
 - 凭据自动桥接：无需配置任何机器相关路径，默认读 `%USERPROFILE%\.codex\auth.json`。
@@ -86,13 +87,12 @@ pnpm add file:C:\Users\wyj\Desktop\dsh_test\dsh_codex_auth\dsh-codex-auth
 
 ### `-1m` 别名（1M 上下文呈现副本）
 
-- `gpt-5.6-sol-1m` / `gpt-5.6-terra-1m` / `gpt-5.6-luna-1m` / `gpt-6-astra-1m` 是四个模型的
-  **呈现副本**：选择器中显示为独立模型，声明与本体一致（`contextWindow: 1000000`、
-  `maxTokens: 128000`、图片输入、推理档位 low/medium/high/xhigh/max）。
+- `gpt-6-astra-1m` 是 `gpt-6-astra` 的**呈现副本**：选择器中显示为独立模型，声明与本体一致
+  （`contextWindow: 1000000`、`maxTokens: 128000`、图片输入、推理档位 low/medium/high/xhigh/max）。
 - **实际调用与本体相同**：pi-ai 把 `model.id` 原样发给 chatgpt.com，因此插件在
   `llm/stream` Waterfall 上把 `*-1m` 重映射回本体（用**新的** options 对象替换请求，
-  从不修改深冻结的请求对象）——后端始终收到 `gpt-5.6-sol`，界面看到的是
-  `gpt-5.6-sol-1m`。
+  从不修改深冻结的请求对象）——后端始终收到 `gpt-6-astra`，界面看到的是
+  `gpt-6-astra-1m`。
 - **重点**：因为重映射发生在瀑布里，pi-ai 实际按**本体模型条目**做容量判定
   （`modelOf` 按最终 `options.model` 解析）。所以本体条目也必须声明真实容量——
   早前本体未声明（`gpt-5.6-*` 回落到 catalog 的 272000、`gpt-6-astra` 回落到默认
@@ -144,7 +144,7 @@ CONTEXT_WINDOW_EXCEEDED`，而对话其实未达到模型的真实容量（输�
 
 修复与重试策略（`cordis.patch.yml`）：
 
-- 给全部八个模型（含本体）声明 `contextWindow: 1000000` / `maxTokens: 128000`，
+- 给全部三个模型（含本体）声明 `contextWindow: 1000000` / `maxTokens: 128000`，
   使判定容量与模型真实能力（及 `-1m` 呈现声明）一致——这是消除误报的根本修复；
 - `retryableCodes` 追加 `CONTEXT_WINDOW_EXCEEDED`：在 web profile 无压缩恢复的
   前提下，给这类失败同样的 5 次 × 10 秒重试兜底（观察到重试可成功；若为真实
@@ -156,8 +156,8 @@ CONTEXT_WINDOW_EXCEEDED`，而对话其实未达到模型的真实容量（输�
 
 ## 使用
 
-- Web 界面的模型选择器中会出现 `OpenAI Codex` 提供方及八个模型
-  （`gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna` / `gpt-6-astra` 及各自 `-1m` 副本），按需选择。
+- Web 界面的模型选择器中会出现 `OpenAI Codex` 提供方及三个模型
+  （`gpt-6-astra-1m` / `gpt-6-astra` / `gpt-5.6-sol`，按此顺序陈列），按需选择。
 - 默认 agent 模型保持 `deepseek-v4-flash-vision-exp` 不变（除非你另外修改
   `agent-default-model` 设置）。
 - 插件日志里每次同步会打印 `[dsh-codex-auth] synced codex OAuth credential ...` 与
@@ -170,7 +170,7 @@ CONTEXT_WINDOW_EXCEEDED`，而对话其实未达到模型的真实容量（输�
 Select-String -Path C:\Users\wyj\.dsh\.credentials.yaml -Pattern "llm-pi-ai/openai-codex"
 ```
 
-在模型选择器里切到 `gpt-5.6-sol` 发一条消息即可。若报认证错误，先运行 `codex login`。
+在模型选择器里切到 `gpt-6-astra` 发一条消息即可。若报认证错误，先运行 `codex login`。
 
 ## 卸载
 
@@ -185,7 +185,7 @@ dsh plugin --profile web remove dsh-codex-auth
 `remove` 会卸载包并从 `dsh.profile.bundles` 移除 `dsh-codex-auth`。重启后：
 
 - `codex-auth` 桥（凭据同步、`-1m` 重映射）停止；
-- `llm-pi-ai` 组合行回落到 dsh-base 的休眠态，`openai-codex` 路由与 6 个模型
+- `llm-pi-ai` 组合行回落到 dsh-base 的休眠态，`openai-codex` 路由与 3 个模型
   从模型选择器中消失。
 
 **第二步：清理凭据记录（可选，推荐）**
