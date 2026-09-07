@@ -1,5 +1,8 @@
 # dsh-codex-auth
 
+> 仓库地址：<https://github.com/casuak/dsh-codex-auth.git><br>
+> 安装使用：`dsh plugin --profile web add file:<本目录>` 或 `git clone https://github.com/casuak/dsh-codex-auth.git` 后本地安装。
+
 利用本机 Codex CLI 的 ChatGPT 登录凭据（`~/.codex/auth.json`），让 DeepSeek Harness 通过
 `llm-pi-ai` 的 `openai-codex` 路由直接调用 GPT 模型（`gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna`）。
 
