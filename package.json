@@ -11,6 +11,7 @@
   },
   "files": [
     "index.js",
+    "proxy.js",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -23,9 +24,11 @@
     "openai",
     "chatgpt"
   ],
+  "scripts": { "test": "node --test" },
+  "dependencies": { "undici": "^8.10.2" },
   "license": "MIT",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.19.0"
   },
   "dsh": {
     "bundle": {

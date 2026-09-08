@@ -6,6 +6,30 @@
 利用本机 Codex CLI 的 ChatGPT 登录凭据（`~/.codex/auth.json`），让 DeepSeek Harness 通过
 `llm-pi-ai` 的 `openai-codex` 路由直接调用 GPT 模型（`gpt-6-astra-1m` / `gpt-6-astra` / `gpt-5.6-sol`）。
 
+## Clash Verge 系统代理（无需 TUN）
+
+插件启动时自动读取 Windows 已启用的系统代理（本机为 `http://127.0.0.1:7897`），
+通过 Undici dispatcher 将 `openai.com`、`chatgpt.com` 及其子域名的 HTTP/SSE 和
+WebSocket 请求送入代理；其他域名沿用原来的连接方式。适用于本 DSH 进程的原生
+fetch/WebSocket 与 Undici 默认 dispatcher，不会修改系统设置或独立 Codex CLI。
+第三方 GPT 中转域名、显式自定义 dispatcher 或其他 HTTP 客户端不在此范围内。
+
+- 优先级：插件 `proxyUrl` → `DSH_GPT_PROXY` → Windows 系统代理 → HTTP(S)/ALL_PROXY 环境变量。
+- 找不到代理会报错；代理连接失败不会回退直连，GPT 域名不受 `NO_PROXY` 绕过。
+- 只支持 HTTP/HTTPS 代理地址（Clash mixed port），不支持 PAC/SOCKS 地址。
+- Clash 仍按自己的规则选择出口；如需确保不从 Clash DIRECT 出口访问，请将 OpenAI/ChatGPT 规则设为代理节点。
+- 需 Node.js >=22.19.0。代理端口或系统代理配置改变后需重启 DSH。
+
+更新已有安装并重启 `dsh web` 后生效（不会热更新当前进程）：
+
+```powershell
+dsh plugin --profile web add file:D:\winshare\icloud\code\dsh-codex-auth
+```
+
+可用 `proxyUrl: http://127.0.0.1:7897` 固定地址（`codex-auth` 行的 `config` 中），
+也可在启动 DSH 的终端设置 `$env:DSH_GPT_PROXY = 'http://127.0.0.1:7897'`。
+启动日志应包含 `GPT HTTP/WebSocket proxy: http://127.0.0.1:7897`。
+
 ## 工作原理
 
 1. 插件（Host 机进程，随 profile 启动）读取 `~/.codex/auth.json` 中的
@@ -25,7 +49,7 @@
 
 ## 在其他电脑上开箱即用
 
-1. **复制/打包本目录**（`package.json` + `index.js` + `cordis.patch.yml` 三个文件即可，
+1. **复制/打包本目录**（`package.json` + `index.js` + `proxy.js` + `cordis.patch.yml`，
    或整个 `dsh-codex-auth` 目录）。
 2. 在该机器上安装到目标 profile：
    ```powershell
