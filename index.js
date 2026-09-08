@@ -28,7 +28,7 @@
  * user still sees `gpt-6-astra-1m`.
  */
 
-import { installGptProxy } from './proxy.js'
+import { installProxySettings } from './settings.js'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -71,7 +71,7 @@ export function apply(ctx, configPassed) {
     : DEFAULT_SYNC_INTERVAL_MS
 
   // Install before any provider request; a missing proxy fails closed.
-  installGptProxy(ctx, cfg)
+  installProxySettings(ctx, cfg)
 
   const credentials = ctx.credentials
   const llm = ctx.get('llm')

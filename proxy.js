@@ -11,7 +11,7 @@ export function parseWindowsProxy(output) {
 }
 
 export function resolveProxyUrl(config = {}, env = process.env, platform = process.platform, readRegistry = () => execFileSync('reg.exe', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings'], { encoding: 'utf8', windowsHide: true })) {
-  let value = config.proxyUrl || env.DSH_GPT_PROXY
+  let value = config.proxyUrl?.trim() || env.DSH_GPT_PROXY
   if (!value && platform === 'win32') {
     try { value = parseWindowsProxy(readRegistry()) } catch { /* Fall back to explicit proxy environment. */ }
   }
@@ -39,16 +39,62 @@ export class GptProxyDispatcher extends Dispatcher {
   }
 }
 
-export function installGptProxy(ctx, config) {
-  const url = resolveProxyUrl(config)
+export function installGptProxy(ctx, config = {}) {
   const previous = getGlobalDispatcher()
-  const proxy = new ProxyAgent(url)
-  const dispatcher = new GptProxyDispatcher(previous, proxy)
+  // Keep one routing wrapper across edits: other plugins may wrap it in turn.
+  const dispatcher = new GptProxyDispatcher(previous, previous)
+  let currentProxy
+  let currentUrl
+  let disposed = false
+  const retiring = new Set()
+  const retire = (proxy) => {
+    if (!proxy) return
+    const pending = proxy.close().catch(error => {
+      console.error(`[dsh-codex-auth] closing proxy failed: ${error.message}`)
+    }).finally(() => retiring.delete(pending))
+    retiring.add(pending)
+  }
+  const update = (next = {}) => {
+    if (disposed) return
+    let url
+    try {
+      url = next.proxyEnabled === false ? undefined : resolveProxyUrl(next)
+    } catch (error) {
+      // Leave the panel usable even when automatic detection finds no proxy.
+      dispatcher.proxy = { dispatch(_options, handler) {
+        handler.onError(error)
+        return false
+      } }
+      retire(currentProxy)
+      currentProxy = undefined
+      currentUrl = null
+      console.error(`[dsh-codex-auth] GPT requests blocked until proxy settings are fixed: ${error.message}`)
+      return
+    }
+    if (url === currentUrl) return
+    // Construct first so a bad replacement cannot break the current route.
+    const proxy = url === undefined ? undefined : new ProxyAgent(url)
+    const old = currentProxy
+    dispatcher.proxy = proxy ?? previous
+    currentProxy = proxy
+    currentUrl = url
+    retire(old)
+    if (url) {
+      const safe = new URL(url)
+      console.log(`[dsh-codex-auth] GPT HTTP/WebSocket proxy: ${safe.protocol}//${safe.host} (OpenAI/ChatGPT domains only)`)
+    } else {
+      console.log('[dsh-codex-auth] GPT proxy disabled; using the original dispatcher')
+    }
+  }
+  update(config)
   setGlobalDispatcher(dispatcher)
   ctx.on('dispose', async () => {
+    disposed = true
+    dispatcher.proxy = previous
     if (getGlobalDispatcher() === dispatcher) setGlobalDispatcher(previous)
-    await proxy.close()
+    retire(currentProxy)
+    currentProxy = undefined
+    await Promise.all(retiring)
   })
-  const safe = new URL(url)
-  console.log(`[dsh-codex-auth] GPT HTTP/WebSocket proxy: ${safe.protocol}//${safe.host} (OpenAI/ChatGPT domains only)`)
+  return { update }
 }

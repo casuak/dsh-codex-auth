@@ -6,6 +6,17 @@
 利用本机 Codex CLI 的 ChatGPT 登录凭据（`~/.codex/auth.json`），让 DeepSeek Harness 通过
 `llm-pi-ai` 的 `openai-codex` 路由直接调用 GPT 模型（`gpt-6-astra-1m` / `gpt-6-astra` / `gpt-5.6-sol`）。
 
+## 代理设置面板
+
+更新安装并重启 DSH、刷新页面后，在 **设置 → 插件 → 可配置项 → dsh-codex-auth** 中：
+
+- **启用代理**：默认开启；关闭后恢复原 dispatcher，不再由本插件强制代理。
+- **代理地址**：例如 `http://127.0.0.1:7897`；留空自动检测系统/环境变量代理。
+- 点击 **保存**，设置持久化到 DSH settings，立即用于新请求，无需再次重启；正在进行的请求不被中断。
+- 开启代理却无法自动检测地址时，GPT 请求会报错而非回退直连，仍可从面板修复或关闭代理。
+
+用户设置优先于 composition 中的 `proxyEnabled` / `proxyUrl`。仅影响 OpenAI/ChatGPT 域名。
+
 ## Clash Verge 系统代理（无需 TUN）
 
 插件启动时自动读取 Windows 已启用的系统代理（本机为 `http://127.0.0.1:7897`），
@@ -18,7 +29,7 @@ fetch/WebSocket 与 Undici 默认 dispatcher，不会修改系统设置或独立
 - 找不到代理会报错；代理连接失败不会回退直连，GPT 域名不受 `NO_PROXY` 绕过。
 - 只支持 HTTP/HTTPS 代理地址（Clash mixed port），不支持 PAC/SOCKS 地址。
 - Clash 仍按自己的规则选择出口；如需确保不从 Clash DIRECT 出口访问，请将 OpenAI/ChatGPT 规则设为代理节点。
-- 需 Node.js >=22.19.0。代理端口或系统代理配置改变后需重启 DSH。
+- 需 Node.js >=22.19.0。面板修改地址/开关实时生效；外部系统代理或环境变量改变后需重启 DSH 重新检测。
 
 更新已有安装并重启 `dsh web` 后生效（不会热更新当前进程）：
 
@@ -49,7 +60,7 @@ dsh plugin --profile web add file:D:\winshare\icloud\code\dsh-codex-auth
 
 ## 在其他电脑上开箱即用
 
-1. **复制/打包本目录**（`package.json` + `index.js` + `proxy.js` + `cordis.patch.yml`，
+1. **复制/打包本目录**（`package.json` + `index.js` + `proxy.js` + `settings.js` + `client.js` + `cordis.patch.yml`，
    或整个 `dsh-codex-auth` 目录）。
 2. 在该机器上安装到目标 profile：
    ```powershell
