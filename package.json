@@ -31,7 +31,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.2",
+    "@deepseek-ai/schemastery": "^3.18.3",
     "undici": "^8.10.2"
   },
   "license": "MIT",

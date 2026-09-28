@@ -69,7 +69,6 @@
               max: max
           - id: gpt-6-astra
             name: gpt-6-astra
-            contextWindow: 1000000
             maxTokens: 128000
             input: [ text, image ]
             reasoningEfforts:

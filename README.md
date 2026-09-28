@@ -6,9 +6,37 @@
 利用本机 Codex CLI 的 ChatGPT 登录凭据（`~/.codex/auth.json`），让 DeepSeek Harness 通过
 `llm-pi-ai` 的 `openai-codex` 路由直接调用 GPT 模型（`gpt-6-astra-1m` / `gpt-6-astra` / `gpt-5.6-sol`）。
 
+## 设置面板位置（重要）
+
+本插件的两个面板都挂在 **设置 → 插件（Plugins）→ 本插件的行 / llm-pi-ai 的行** 上——
+即打开插件卡片后，行上的「配置」入口所打开的页面：
+
+- **dsh-codex-auth** 行 → 代理设置面板；
+- **`@deepseek-ai/dsh-llm-pi-ai`** 行 → 模型上下文面板。
+
+客户端一半通过客户端槽位 `plugins.row.config` 注册页面，键分别是
+`dsh-codex-auth#codex-auth` 与 `@deepseek-ai/dsh-llm-pi-ai#llm-pi-ai`，
+表单数据取自客户端的 `configForms` 服务（按 namespace 取：`codex-auth` / `llm-pi-ai`）。
+
+> 升级提示：旧版本注入客户端服务 `settingsScope` 并向槽位 `settings.plugin.item`
+> 注册卡片。两者在当前 DSH 客户端都已不存在，结果是插件一直停留在
+> `pending (waiting for service: settingsScope)`、整个客户端插件不激活
+> （页面顶部报 “Failed to load plugins / 1 entry did not activate”）。
+> 现版本改用 `inject: ['slots', 'configForms']` + `plugins.row.config`。
+
+## 模型上下文设置面板
+
+更新安装并重启 DSH、刷新页面后，在 **设置 → 插件 → `llm-pi-ai` 行 → 配置** 中：
+
+- 按 `openai-codex` 已配置的模型列表，分别编辑 **contextWindow**（单位 token）。支持自定义模型，不限于内置三个模型。
+- 输入正整数；留空移除显式值，使用 pi-ai 模型目录或提供方默认值。
+- 点击 **保存**，直接持久化到 `llm-pi-ai.providers.openai-codex.models`，后续请求使用新配置，无需再次重启。正在进行的请求保留原配置。
+- 保留模型的 `maxTokens`、图片输入、推理档位等其他配置，不改变其他提供方。
+- 设置的是 DSH 使用的上下文容量，不会提高服务端的实际限制。并发修改时请点击 **重新载入** 后再编辑。
+
 ## 代理设置面板
 
-更新安装并重启 DSH、刷新页面后，在 **设置 → 插件 → 可配置项 → dsh-codex-auth** 中：
+更新安装并重启 DSH、刷新页面后，在 **设置 → 插件 → `dsh-codex-auth` 行 → 配置** 中：
 
 - **启用代理**：默认开启；关闭后恢复原 dispatcher，不再由本插件强制代理。
 - **代理地址**：例如 `http://127.0.0.1:7897`；留空自动检测系统/环境变量代理。
@@ -16,6 +44,16 @@
 - 开启代理却无法自动检测地址时，GPT 请求会报错而非回退直连，仍可从面板修复或关闭代理。
 
 用户设置优先于 composition 中的 `proxyEnabled` / `proxyUrl`。仅影响 OpenAI/ChatGPT 域名。
+
+面板的读写走当前 DSH 的配置通道：插件通过导出 `Config`（schemastery schema）声明可配置项，
+其中 `proxyEnabled` / `proxyUrl` 标记为 `volatile()`（可实时编辑）。面板保存时写入 profile
+patch 并重新激活插件，因此**保存后立即生效、无需重启**；`volatile()` 需要
+`@deepseek-ai/schemastery` >= 3.18.3（`package.json` 已如此声明）。
+
+> 升级提示：旧版本曾在 `apply` 里调用 `ctx.get('settings').register(...)`。当前 DSH 的
+> `settings` 是一个 `SettingsForms` 服务，只有 `configure/describe/update/replace/mutate`，
+> **没有 `register`**——该调用会抛出 `TypeError: settings?.register is not a function` 并使
+> 整个插件启动失败（凭据桥接、`-1m` 重映射、代理全部不生效）。现版本已移除该调用。
 
 ## Clash Verge 系统代理（无需 TUN）
 
@@ -262,11 +300,20 @@ llm-pi-ai:
 
 ## 配置项（可选）
 
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `authPath` | `%USERPROFILE%\.codex\auth.json` | Codex 认证文件路径 |
-| `recordKey` | `llm-pi-ai/openai-codex` | 写入的 DSH 凭据记录键 |
-| `syncIntervalMs` | `30000` | 同步间隔 |
+| 字段 | 默认 | 可实时编辑 | 说明 |
+|---|---|---|---|
+| `authPath` | `%USERPROFILE%\.codex\auth.json` | 否 | Codex 认证文件路径 |
+| `recordKey` | `llm-pi-ai/openai-codex` | 否 | 写入的 DSH 凭据记录键 |
+| `syncIntervalMs` | `30000` | 否 | 同步间隔 |
+| `proxyEnabled` | `true` | 是 | 是否由本插件代理 GPT 域名 |
+| `proxyUrl` | 空（自动检测） | 是 | HTTP/HTTPS 代理地址 |
+
+「可实时编辑」的字段同时出现在 **设置 → 插件 → 可配置项 → dsh-codex-auth** 面板中；
+其余字段只能写在 `config:` 里（改动后需重新激活插件，通常重启即可）。
+
+> 注意：`Config` schema 必须声明 `apply` 读取的**每一个**字段——cordis 在校验行配置时
+> 会丢弃 schema 未声明的键；同时至少要有一个 `volatile()` 字段，否则设置服务会以
+> `Plugin entry … has no volatile fields` 拒绝保存。
 
 在 `cordis.patch.yml` 的插入行 `config:`（或本包的 `cordis.patch.yml`）中覆盖：
 

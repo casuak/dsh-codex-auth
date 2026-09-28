@@ -28,12 +28,20 @@
  * user still sees `gpt-6-astra-1m`.
  */
 
-import { installProxySettings } from './settings.js'
+import { Config, installProxySettings, readConfigValue } from './settings.js'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 export const name = 'codex-auth'
+
+/**
+ * Plugin Config schema. Cordis validates the row `config` against it before
+ * `apply` runs and re-resolves it whenever the profile patch changes, which is
+ * what makes the settings panel edits live. Every field `apply` reads must be
+ * declared here: validation drops undeclared keys.
+ */
+export { Config }
 
 export const inject = ['credentials', 'timer']
 
@@ -60,17 +68,25 @@ export function apply(ctx, configPassed) {
   const cfg = (configPassed !== null && configPassed !== undefined && typeof configPassed === 'object')
     ? configPassed
     : {}
-  const authPath = typeof cfg.authPath === 'string' && cfg.authPath.length > 0
-    ? cfg.authPath
+  // Every field below is declared in `Config`, so cordis has already validated
+  // it and applied the schema defaults. A volatile field (the proxy pair) is a
+  // cosmokit `{ get() }` wrapper here and must be read through readConfigValue.
+  const authPathValue = readConfigValue(cfg.authPath)
+  const recordKeyValue = readConfigValue(cfg.recordKey)
+  const syncIntervalValue = readConfigValue(cfg.syncIntervalMs)
+  const authPath = typeof authPathValue === 'string' && authPathValue.length > 0
+    ? authPathValue
     : join(homedir(), '.codex', 'auth.json')
-  const recordKey = typeof cfg.recordKey === 'string' && cfg.recordKey.length > 0
-    ? cfg.recordKey
+  const recordKey = typeof recordKeyValue === 'string' && recordKeyValue.length > 0
+    ? recordKeyValue
     : DEFAULT_RECORD_KEY
-  const syncIntervalMs = Number.isFinite(cfg.syncIntervalMs) && cfg.syncIntervalMs > 0
-    ? cfg.syncIntervalMs
+  const syncIntervalMs = Number.isFinite(syncIntervalValue) && syncIntervalValue > 0
+    ? syncIntervalValue
     : DEFAULT_SYNC_INTERVAL_MS
 
   // Install before any provider request; a missing proxy fails closed.
+  // `cfg` is already schema-validated (defaults applied); each settings save
+  // re-activates this plugin with the new config, so the proxy updates live.
   installProxySettings(ctx, cfg)
 
   const credentials = ctx.credentials
